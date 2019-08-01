@@ -15,70 +15,152 @@ from scipy import interpolate
 import json
 import argparse
 
-import gspread
+import tkinter as tk
+import tkinter
+import numpy as np
+
+import petalcomm
+import petal
+
+import tkinter.filedialog
+import tkinter.messagebox
+
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+
 import pandas as pd
-from gspread_dataframe import get_as_dataframe
-from oauth2client.service_account import ServiceAccountCredentials
+
 # nominal hole location data
 
-plt.ion()
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-w", "--wait", help="Determines amount of time between measuring temperature",action='store',dest='wait',default=None)
-parser.add_argument('petal',type=int,help="Petal Number")
-parser.add_argument('pc',type=int,help="Petal Controller Number")
-results = parser.parse_args()
-
-class PlotPetalBoxTemps():
-    def __init__(self):
+class PosPlottingApp(tk.Frame):
+    def __init__(self, master = None):
+        tk.Frame.__init__(self, master, bg = 'white')
         self.start_time = datetime.datetime.now()
         self.file_path = '/home/msdos/focalplane/pos_utility/'
         self.temp_log_path = os.getcwd()#'/home/msdos/test_util/temp_logs/'
- 
-        self.wait = int(results.wait)
-        if self.wait is None:
-            self.wait = 60
+        
 
-        print("Temperature will be read every %d seconds"%self.wait)
-
-        self.temp_log = open(self.temp_log_path+'/temp_log_%s.txt'%str(self.start_time),'w')
         self.hole_coords = np.genfromtxt(self.file_path+'hole_coords.csv', delimiter = ',', usecols = (3,4), skip_header = 40)
         self.nons = [38, 331, 438, 460, 478, 479, 480, 481, 497, 498, 499, 500, 513, 514, 515, 516, 527, 528, 529, 530, 531, 535, 536, 537, 538, 539, 540]
         self.gifs = [541, 542]
         self.fifs = [11, 75, 150, 239, 321, 439, 482, 496, 517, 534]
-        try:
-            self.petal = str(results.petal).zfill(2)
-            self.comm = petalcomm.PetalComm(int(str(results.pc)))
-        except:
-            print('Must be run with two arguments: petal # and petalbox #')
-            sys.exit()
 
-        self.init_temps=[-40, -35, -30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125]
-        self.adc=[3972.291151, 3927.370935, 3869.451327, 3795.92674, 3704.600096, 3593.238247, 3460.369957, 
-                  3305.419031, 3129.278263, 2933.684449, 2721.964441, 2500.36307, 2273.125056, 2048, 1829.510403, 
-                  1621.972457, 1428.638708, 1251.753073, 1091.966263, 949.5873406, 823.911807, 713.9506234, 618.034474, 
-                  535.4993046, 464.1503813, 402.5825068, 348.8588418, 302.7049454, 263.3419356, 229.9160146, 201.3532376, 
-                  176.832823, 155.6819655, 137.3646468]
+        self.collect_data = False
 
-        self.f2 = interpolate.interp1d(self.adc, self.init_temps, kind = 'cubic')
+        self.mean_temp = []
+        self.pb_temps = {'PBOX_TEMP_SENSOR':[], 'FPP_TEMP_SENSOR_1': [], 'FPP_TEMP_SENSOR_2': [], 'FPP_TEMP_SENSOR_3': [], 'GXB_TEMP_SENSOR': []}
+        self.adc_values = {'ADC2': [], 'ADC3': [], 'ADC1': [], 'ADC4': [], 'ADC0' = []}
+
+        self.createWidgets()
+
+    def createWidgets(self):
+        window = tk.Frame(root, bg = 'white')
+        window.pack(side='top', fill='both')
+        plot_window = tk.Frame(root, bg = 'white')
+        plot_window.pack(side='bottom', fill='both')
+
+        #set PC
+        self.PC_entry = tk.Entry(window, width = 8, justify = 'right')
+        self.PC_entry.grid(column=0, row=0)
+        self.PC_button = tk.Button(window, width = 10, text = 'CONNECT TO PC', command=lambda: self.set_PC())
+        self.PC_button.grid(column=0,row=1)
+
+        #wait time
+        self.wait_time_entry = tk.Entry(window, width = 8, justify = 'right')
+        self.wait_time_entry.grid(column=2, row=0)
+        self.wait_time_entry.insert(0, 120)
+        self.wait_time_button = tk.Button(window, width = 10, text = 'WAIT TIME', command=lambda: self.set_wait())
+        self.wait_time_button.grid(column=2,row=1)
+
+        #Start & Stop
+        self.start_button = tk.Button(window, width = 10, text = 'START', command=lambda: self.start())
+        self.start_button.grid(column=3, row=0)
+        self.stop_button = tk.Button(window, width = 10, text = 'STOP', command=lambda: self.stop())
+        self.stop_button.grid(column=3, row=1)
+
+        self.run()
+
+    def set_PC(self):
+        Petal_to_PC = {0:4, 1:5, 2:6, 3:3, 4:8, 5:10, 6:11, 7:2, 8:7, 9:9}
+        self.PC = int(self.PC_entry.get())
+        self.petal = Petal_to_PC(self.PC)
+        self.comm = petalcomm.PetalComm(self.PC)
+        petal_label = tk.Text(root, text = "Connected to PC%s on Petal %s" % (str(self.PC), str(self.petal)))
+        petal_label.grid(column=1, row=0)
+        self.temp_log = open(self.temp_log_path+'/temp_log_PC_%d_%s.txt'%str(self.PC, self.start_time),'w')
+
+    def set_wait(self)
+        self.wait = int(self.wait_time_entry.get())
+        wait_label = tk.Text(root, text = "Waiting %s seconds between calls" % str(self.wait))
+        wait_label.grid(column=1, row=1)
+
+    def start(self):
+        self.collect_data = True
+        data_collect_label = tk.Text(root, text = "Data is being collected")
+        data_collect_label.grid(column=4, row=0)
+
+        self.get_temps()
+        #GO GET DATA
+
+    def stop(self):
+        self.collect_data = False
+        data_collect_label = tk.Text(root, text = "Data not being collected")
+        data_collect_label.grid(column=4, row=1)
+
+
 
     def get_temps(self):
         measure_time = datetime.datetime.now()
-        temp_dict = self.comm.pbget('posfid_temps')
-        print(measure_time)
-        ids=[]
-        temps=[]
-        for id,val in temp_dict.items():
-            _ids=list(val.keys())
-            _temps=list(self.f2([t for t in val.values()]))
-            ids=ids+_ids
-            temps=temps+_temps
-        self.ids = ids
-        self.temps=temps
-        self.temp_log.write(str(measure_time)+'\n')
-        for t in temps:
-            self.temp_log.write(str(t)+', ')
+        current_pos_dict = self.comm.pbget('posfid_temps')
+        pd_dict = self.comm.pbget('pd_temps')
+        adc_dict = self.comm.pbget('adcs')
+
+        pos_temps = []
+        for can, val in current_pos_dict.items():
+            pos_temps.append(list(t for t in val.values()))
+        self.current_pos_temps = np.hstack(pos_temps)
+        self.mean_temp.append(np.mean(self.current_pos_temps))
+
+        for i in self.pb_temps.keys():
+            try:
+                self.pb_temps[i].append(pd_dict[i])
+            except:
+                pass
+
+        for i in self.adc_values.keys():
+            try:
+                self.adc_values[i].append(adc_dict[i])
+            except:
+                pass
+
+        D = {measure_time: [current_pos_dict, pd_dict, adc_dict]}
+        self.temp_log.write(str(D))
         self.temp_log.write('\n')
+
+        self.make_plot()
+
+    def make_plot(self):
+        gridsize = (4, 3)
+        fig = plt.figure(figsize=(12, 8))
+        ax1 = plt.subplot2grid(gridsize, (0, 0), colspan=3, rowspan=3)
+        ax2 = plt.subplot2grid(gridsize, (3, 0))
+        ax3 = plt.subplot2grid(gridsize, (3, 1))
+        ax4 = plt.subplot2grid(gridsize, (3, 2))
+
+        ax2.hist(self.current_pos_temps, bins = 25)
+        ax3.plot(self.pb_temps['PBOX_TEMP_SENSOR'], '-x', label = 'PBOX')
+        ax3.plot(self.pb_temps['FPP_TEMP_SENSOR_1'], '-x', label = 'FPP1')
+        ax3.plot(self.pb_temps['FPP_TEMP_SENSOR_2'], '-x', label = 'FPP2')
+        ax3.plot(self.pb_temps['FPP_TEMP_SENSOR_3'], '-x', label = 'FPP3')
+        ax3.plot(self.pb_temps['GXB_TEMP_SENSOR'], '-x', label = 'GXB')
+        ax3.legend()
+
+        ax4.plot(self.adc_values['ADC2'], '-x', label = 'ADC2')
+        ax4.plot(self.adc_values['ADC3'], '-x', label = 'ADC3')
+        ax4.plot(self.adc_values['ADC1'], '-x', label = 'ADC1')
+        ax4.plot(self.adc_values['ADC4'], '-x', label = 'ADC4')
+        ax4.plot(self.adc_values['ADC0'], '-x', label = 'ADC0')
+        ax4.legend()
 
     def plot_hole_info(self):
         for i in range(len(self.hole_coords)):
@@ -198,20 +280,13 @@ class PlotPetalBoxTemps():
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-    def __call__(self):
-        self.get_temps()
-        self.initial_plot()
-        time.sleep(self.wait)
-        while True:
-           try:
-               self.get_temps()
-               self.updated_plot()
-               time.sleep(self.wait)
-           except KeyboardInterrupt:
-               print('interrupted!')
+    def run(self):
+        while self.collect_data == True:
+            self.get_temps()
+            time.sleep(self.wait)
 
 if __name__ == '__main__':
-    P = PlotPetalBoxTemps()
+    P = PosPlottingApp()
     P()
 
     
