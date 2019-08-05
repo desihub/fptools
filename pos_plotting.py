@@ -36,7 +36,7 @@ class PosPlottingApp(tk.Frame):
         self.start_time = datetime.datetime.now()
         self.file_path = '/home/msdos/focalplane/pos_utility/'
         self.temp_log_path = os.getcwd()#'/home/msdos/test_util/temp_logs/'
-        self.pos_index_file = '/software/products/PositionerIndexTable-trunk/desi_positioner_indexes.csv'
+        self.pos_index_file = 'desi_positioner_indexes.csv'
         
 
         self.hole_coords = np.genfromtxt(self.file_path+'hole_coords.csv', delimiter = ',', usecols = (3,4), skip_header = 40)
@@ -45,11 +45,13 @@ class PosPlottingApp(tk.Frame):
         self.fifs = [11, 75, 150, 239, 321, 439, 482, 496, 517, 534]
 
         self.collect_data = False
-        self.wait = 20
+        self.wait = 120
         self.num_times = 0
+        self.power_off = False
 
         self.mt = []
         self.mean_temp = []
+        self.can_buses= {'can10','can11','can12','can13','can14','can15','can16','can17','can22','can23'}
         self.pb_temps = {'PBOX_TEMP_SENSOR':[], 'FPP_TEMP_SENSOR_1': [], 'FPP_TEMP_SENSOR_2': [], 'FPP_TEMP_SENSOR_3': [], 'GXB_TEMP_SENSOR': []}
         self.adc_values = {'ADC2': [], 'ADC3': [], 'ADC1': [], 'ADC4': [], 'ADC0': []}
 
@@ -93,7 +95,6 @@ class PosPlottingApp(tk.Frame):
         self.petal = Petal_to_PC[self.PC]
         self.comm = petalcomm.PetalComm(self.PC)
         petal_label = print("Connected to PC%s on Petal %s" % (str(self.PC), str(self.petal)))
-        self.temp_log = open(self.temp_log_path+'/temp_log_PC_%s.txt'%str(self.PC),'w')
 
         df = pd.read_csv(self.pos_index_file)
         self.pdf=df.loc[df['PETAL_ID'] == int(self.petal)]
@@ -119,17 +120,29 @@ class PosPlottingApp(tk.Frame):
         self.current_time = datetime.datetime.now()
         print("Taking Temp Data: ", self.current_time)
         self.mt.append(self.current_time)
+        
         current_pos_dict = self.comm.pbget('posfid_temps')
+        #Check if power is on
+        total = 0 
+        for can in self.can_buses:
+            num = len(current_pos_dict[can])
+            total += num
+        if total == 0:
+            print("Power not on")
+            self.power_off = True
+
         pb_dict = self.comm.pbget('pb_temps')
         adc_dict = self.comm.pbget('adcs')
-
-        self.all_temps = []
-        self.ids = []
-        for can, val in current_pos_dict.items():
+        if self.power_off == True:
+            self.mean_temp.append(np.nan)
+        else:
+            self.all_temps = []
+            self.ids = []
+            for can, val in current_pos_dict.items():
                 for i, t in val.items():
                     self.all_temps.append(t)
                     self.ids.append(i)
-        self.mean_temp.append(np.mean(self.all_temps))
+            self.mean_temp.append(np.mean(self.all_temps))
 
         for i in self.pb_temps.keys():
             try:
@@ -144,8 +157,14 @@ class PosPlottingApp(tk.Frame):
                 self.adc_values[i].append(np.nan)
 
         D = {self.current_time: [current_pos_dict, pb_dict, adc_dict]}
+        print(D)
+        #Start Temperature log
+        self.temp_log = open(self.temp_log_path+'/temp_log_PC_%s.txt'%str(self.PC),'a+')
+
         self.temp_log.write(str(D))
         self.temp_log.write('\n')
+        self.temp_log.close()
+        print('wrote temp log')
 
         self.make_plot()
 
@@ -164,13 +183,13 @@ class PosPlottingApp(tk.Frame):
         ax4 = fig.add_subplot(gs[2, 2])
 
         ax1.set_title(self.current_time)
-        
-        bins = np.linspace(np.min(self.all_temps), np.max(self.all_temps), 25)
-        pos_temps = np.array(self.all_temps)[np.where(np.array(self.ids) < 10000)[0]]
-        fid_temps = np.array(self.all_temps)[np.where(np.array(self.ids) > 10000)[0]]
-        ax2.hist(pos_temps, bins = bins, label = 'Pos')
-        ax2.hist(fid_temps, bins=bins, label = 'Fids')
-        ax2.legend(prop={'size': 6})
+        if self.power_off == False:  
+            bins = np.linspace(np.min(self.all_temps), np.max(self.all_temps), 25)
+            pos_temps = np.array(self.all_temps)[np.where(np.array(self.ids) < 10000)[0]]
+            fid_temps = np.array(self.all_temps)[np.where(np.array(self.ids) > 10000)[0]]
+            ax2.hist(pos_temps, bins = bins, label = 'Pos')
+            ax2.hist(fid_temps, bins=bins, label = 'Fids')
+            ax2.legend(prop={'size': 6})
 
         mt = [m.strftime("%H:%M:%S") for m in self.mt]
         ax3.plot(mt, self.pb_temps['PBOX_TEMP_SENSOR'], '-x', label = 'PBOX')
@@ -214,36 +233,37 @@ class PosPlottingApp(tk.Frame):
         self.hole_list=self.pdf['DEVICE_LOC'].tolist()
         self.dev_id_loc=dict(zip(self.dev_list,self.hole_list))
 
-        holes = []
-        idx = []
-        for i,e in enumerate(self.ids):
-            try:
-                holes.append(self.dev_id_loc[e])
-                idx.append(i)
-            except:
-                print('failed: ',e)
-                self.nons.append(e)
-                pass
-        temps = np.array(self.all_temps)[np.array(idx)]
+        if self.power_off == False:
+            holes = []
+            idx = []
+            for i,e in enumerate(self.ids):
+                try:
+                    holes.append(self.dev_id_loc[e])
+                    idx.append(i)
+                except:
+                    print('failed: ',e)
+                    self.nons.append(e)
+                    pass
+            temps = np.array(self.all_temps)[np.array(idx)]
 
-        x = []
-        y = []
-        idx2 = []
-        for i,e in enumerate(holes):
-            try:
-                x.append(self.hole_coords[int(e)][0])
-                y.append(self.hole_coords[int(e)][1])
-                idx2.append(i)
-            except:
-                print('failed: ',new_ids[i])
-                self.nons.append(new_ids[i])
-                pass
-        temps = temps[np.array(idx2)]
-        x = np.array(x)
-        y = np.array(y)
+            x = []
+            y = []
+            idx2 = []
+            for i,e in enumerate(holes):
+                try:
+                    x.append(self.hole_coords[int(e)][0])
+                    y.append(self.hole_coords[int(e)][1])
+                    idx2.append(i)
+                except:
+                    print('failed: ',new_ids[i])
+                    self.nons.append(new_ids[i])
+                    pass
+            temps = temps[np.array(idx2)]
+            x = np.array(x)
+            y = np.array(y)
 
-        sc = ax1.scatter(x,y,s=120,c=temps)
-        self.cbar = plt.colorbar(sc, ax=ax1)
+            sc = ax1.scatter(x,y,s=120,c=temps)
+            self.cbar = plt.colorbar(sc, ax=ax1)
         self.canvas = FigureCanvasTkAgg(fig, master=root)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.canvas._tkcanvas.pack()
