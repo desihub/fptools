@@ -30,6 +30,7 @@ import pandas as pd
 
 from bokeh.plotting import figure, show, output_file
 from bokeh.layouts import gridplot
+from bokeh.models import ColumnDataSource
 
 # nominal hole location data
 
@@ -53,12 +54,11 @@ class PosPlottingApp(tk.Frame):
         self.power_off = False
 
         self.mt = []
-        self.mean_temp = []
-        self.can_buses= {'can10','can11','can12','can13','can14','can15','can16','can17','can22','can23'}
-        self.pb_temps = {'PBOX_TEMP_SENSOR':[], 'FPP_TEMP_SENSOR_1': [], 'FPP_TEMP_SENSOR_2': [], 'FPP_TEMP_SENSOR_3': [], 'GXB_TEMP_SENSOR': []}
-        self.adc_values = {'ADC2': [], 'ADC3': [], 'ADC1': [], 'ADC4': [], 'ADC0': []}
+        self.pd_columns = ['PBOX_TEMP_SENSOR','FPP_TEMP_SENSOR_1','FPP_TEMP_SENSOR_2','FPP_TEMP_SENSOR_3','GXB_TEMP_SENSOR','ADC2','ADC3','ADC1','ADC4','ADC0','MEAN_TEMP','POS_TEMPS','MT'] 
+        self.pd_source = pd.DataFrame(columns=self.pd_columns)
+        self.source = ColumnDataSource(data=self.pd_source)
 
-        output_file("title.html")
+        output_file("pos_temp.html")
 
         self.createWidgets()
 
@@ -67,7 +67,6 @@ class PosPlottingApp(tk.Frame):
         window = tk.Frame(bg = 'white')
         window.pack(side='top', fill='both')
     
-
         #set PC
         self.PC_entry = tk.Entry(window, width = 8, justify = 'right')
         self.PC_entry.grid(column=0, row=0)
@@ -128,17 +127,19 @@ class PosPlottingApp(tk.Frame):
         current_pos_dict = self.comm.pbget('posfid_temps')
         #Check if power is on
         total = 0 
-        for can in self.can_buses:
+        for can in current_pos_dict.keys():
             num = len(current_pos_dict[can])
             total += num
         if total == 0:
             print("Power not on")
             self.power_off = True
+        else:
+            self.power_off = False
 
         pb_dict = self.comm.pbget('pb_temps')
         adc_dict = self.comm.pbget('adcs')
         if self.power_off == True:
-            self.mean_temp.append(np.nan)
+            self.mean_temp = np.nan
         else:
             self.all_temps = []
             self.ids = []
@@ -146,26 +147,30 @@ class PosPlottingApp(tk.Frame):
                 for i, t in val.items():
                     self.all_temps.append(t)
                     self.ids.append(i)
-            self.mean_temp.append(np.mean(self.all_temps))
+            self.mean_temp = np.mean(self.all_temps)
 
-        for i in self.pb_temps.keys():
-            try:
-                self.pb_temps[i].append(pb_dict[i])
-            except:
-                self.pb_temps[i].append(np.nan)
+        new_data = []
+        for idx in self.pd_columns:
+            if idx in pb_dict.keys():
+                d = pb_dict[idx]
+            elif idx in adc_dict.keys():
+                d = adc_dict[idx]
+            elif idx == 'MEAN_TEMP':
+                d = self.mean_temp
+            elif idx == 'POS_TEMPS':
+                d = current_pos_dict
+            elif idx == 'MT':
+                d = self.current_time
+            new_data.append(d)
 
-        for i in self.adc_values.keys():
-            try:
-                self.adc_values[i].append(adc_dict[i])
-            except:
-                self.adc_values[i].append(np.nan)
+        new_df = pd.DataFrame(new_data, columns = self.pd_columns)
+        self.pd_source.append(new_df, ignore_index=True)
 
-        D = {self.current_time: [current_pos_dict, pb_dict, adc_dict]}
-        print(D)
+        self.source = self.pd_source
         #Start Temperature log
         self.temp_log = open(self.temp_log_path+'/temp_log_PC_%s.txt'%str(self.PC),'a+')
 
-        self.temp_log.write(str(D))
+        self.temp_log.write(str(new_data.to_dict(index=False)))
         self.temp_log.write('\n')
         self.temp_log.close()
         print('wrote temp log')
@@ -176,29 +181,30 @@ class PosPlottingApp(tk.Frame):
     def make_plot(self):
 
         #p1 = figure(plot_width=800, plot_height=300) 
-        p2 = figure(plot_width=400, plot_height=400) 
         p3 = figure(plot_width=400, plot_height=400) 
         p4 = figure(plot_width=400, plot_height=400) 
 
         #P2 - Histogram
-        bins = np.linspace(np.min(self.all_temps), np.max(self.all_temps), 25)
-        pos_temps = np.array(self.all_temps)[np.where(np.array(self.ids) < 10000)[0]]
-        fid_temps = np.array(self.all_temps)[np.where(np.array(self.ids) > 10000)[0]]
-        p_hist, p_edges = np.histogram(pos_temps, density=True, bins=50)
-        p2.quad(top=p_hist, bottom=0, left=p_edges[:-1], right=p_edges[1:],
-           fill_color="navy", line_color="blue", alpha=0.5, legend = 'Positioners')
-        f_hist, f_edges = np.histogram(fid_temps, density=True, bins=50)
-        p2.quad(top=f_hist, bottom=0, left=f_edges[:-1], right=f_edges[1:],
-           fill_color="navy", line_color="orange", alpha=0.5, legend = 'Fiducials')
+        if self.power_off == False:
+            p2 = figure(plot_width=400, plot_height=400)
+            bins = np.linspace(np.min(self.all_temps), np.max(self.all_temps), 25)
+            pos_temps = np.array(self.all_temps)[np.where(np.array(self.ids) < 10000)[0]]
+            fid_temps = np.array(self.all_temps)[np.where(np.array(self.ids) > 10000)[0]]
+            p_hist, p_edges = np.histogram(pos_temps, density=True, bins=50)
+            p2.quad(top=p_hist, bottom=0, left=p_edges[:-1], right=p_edges[1:],
+               fill_color="navy", line_color="blue", alpha=0.5, legend = 'Positioners')
+            f_hist, f_edges = np.histogram(fid_temps, density=True, bins=50)
+            p2.quad(top=f_hist, bottom=0, left=f_edges[:-1], right=f_edges[1:],
+               fill_color="navy", line_color="orange", alpha=0.5, legend = 'Fiducials')
 
         #P3 - Line
         mt = [m.strftime("%H:%M:%S") for m in self.mt]
-        p3.line(mt, self.pb_temps['PBOX_TEMP_SENSOR'], legend = 'PBOX')
-        p3.line(mt, self.pb_temps['FPP_TEMP_SENSOR_1'], legend = 'FPP1')
-        p3.line(mt, self.pb_temps['FPP_TEMP_SENSOR_2'], legend = 'FPP2')
-        p3.line(mt, self.pb_temps['FPP_TEMP_SENSOR_3'], legend = 'FPP3')
-        p3.line(mt, self.pb_temps['GXB_TEMP_SENSOR'], legend = 'GXB')
-        p3.line(mt, self.mean_temp, legend = 'Mean POS')
+        p3.line('MT', 'PBOX_TEMP_SENSOR', source=self.source, line_dash="dashed", legend = 'PBOX')
+        p3.line(mt, self.pb_temps['FPP_TEMP_SENSOR_1'],line_dash="dashed", legend = 'FPP1')
+        p3.line(mt, self.pb_temps['FPP_TEMP_SENSOR_2'],line_dash="dashed", legend = 'FPP2')
+        p3.line(mt, self.pb_temps['FPP_TEMP_SENSOR_3'],line_dash="dashed", legend = 'FPP3')
+        p3.line(mt, self.pb_temps['GXB_TEMP_SENSOR'],line_dash="dashed", legend = 'GXB')
+        p3.line(mt, self.mean_temp,line_dash="dashed", legend = 'Mean POS')
 
         #P4 - Line
         p4.line(mt, self.adc_values['ADC2'], legend = 'ADC2')
@@ -265,9 +271,11 @@ class PosPlottingApp(tk.Frame):
         #     sc = ax1.scatter(x,y,s=120,c=temps)
         #     self.cbar = plt.colorbar(sc, ax=ax1)
 
-
-        grid = gridplot([p2, p2, p3], ncols=2, plot_width=400, plot_height=400, toolbar_location=None)
-        
+        if self.power_off == False:
+            grid = gridplot([p2, p3, p4], ncols=2, plot_width=400, plot_height=400, toolbar_location=None)
+        else:
+            grid = gridplot([p3, p4], ncols=2, plot_width=400, plot_height=400, toolbar_location=None)
+        show(grid) 
         self.num_times += 1
 
     def run(self):
