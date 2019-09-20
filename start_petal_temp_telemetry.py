@@ -27,6 +27,7 @@ import tkinter.messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 import pandas as pd
+from threading import Thread
 
 # nominal hole location data
 
@@ -149,31 +150,34 @@ class PetalTempApp():
                 self.get_temps('fid')
                 time.sleep(self.fidtemp_wait)
             self.get_temps('pos')
-            time.sleep(self.fitemp_wait)
+            time.sleep(self.fidtemp_wait)
 
 if __name__ == '__main__':
-    postemp_wait = int(input("How long should you wait between taking measurements of the positioner temps? (sec): "))
-    fidtemp_wait = int(input("How long should you wait between taking measurements of the fiducial temps? (sec): "))
+    postemp_wait = 300 #int(input("How long should you wait between taking measurements of the positioner temps? (sec): "))
+    fidtemp_wait = 30 #int(input("How long should you wait between taking measurements of the fiducial temps? (sec): "))
+    #pc = int(input("Which PC? "))
+    #P = PetalTempApp(pc, postemp_wait, fidtemp_wait)
+    #P.run()
 
-    #P0=PetalTempApp(0, postemp_wait, fidtemp_wait)
-    #P1=PetalTempApp(1, postemp_wait, fidtemp_wait)
-    #P2=PetalTempApp(2, postemp_wait, fidtemp_wait)
-    #P3=PetalTempApp(3, postemp_wait, fidtemp_wait)
-    #P4=PetalTempApp(4, postemp_wait, fidtemp_wait)
+    P0=PetalTempApp(0, postemp_wait, fidtemp_wait)
+    P1=PetalTempApp(1, postemp_wait, fidtemp_wait)
+    P2=PetalTempApp(2, postemp_wait, fidtemp_wait)
+    P3=PetalTempApp(3, postemp_wait, fidtemp_wait)
+    P4=PetalTempApp(4, postemp_wait, fidtemp_wait)
     P5=PetalTempApp(5, postemp_wait, fidtemp_wait)
-    #P6=PetalTempApp(6, postemp_wait, fidtemp_wait)
-    #P7=PetalTempApp(7, postemp_wait, fidtemp_wait)
-    #P8=PetalTempApp(8, postemp_wait, fidtemp_wait)
-    #P9=PetalTempApp(9, postemp_wait, fidtemp_wait)
+    P6=PetalTempApp(6, postemp_wait, fidtemp_wait)
+    P7=PetalTempApp(7, postemp_wait, fidtemp_wait)
+    P8=PetalTempApp(8, postemp_wait, fidtemp_wait)
+    P9=PetalTempApp(9, postemp_wait, fidtemp_wait)
 
-    #P0.run()
-    #P1.run()
-    #P2.run()
-    #P3.run()
-    #P4.run()
-    P5.run()
-    #P6.run()
-    #P7.run()
-    #P8.run()
-    #P9.run()
+    Thread(P0.run()).start()
+    Thread(P1.run()).start()
+    Thread(P2.run()).start()
+    Thread(P3.run()).start()
+    Thread(P4.run()).start()
+    Thread(P5.run()).start()
+    Thread(P6.run()).start()
+    Thread(P7.run()).start()
+    Thread(P8.run()).start()
+    Thread(P9.run()).start()
 
