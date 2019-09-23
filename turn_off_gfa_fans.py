@@ -16,12 +16,12 @@ for pc in [0,1,2,3,4,5,6,7,8,9]:
     	print("Can't connect with PC%d" % pc)
 
 for i, comm in enumerate(Comms):
-    comm.pbset('GFA_FAN', {'inlet':['on', 15],'outlet':['on',15]})
+    comm.pbset('GFA_FAN', {'inlet':['off', 0],'outlet':['off', 0]})
 
 
 print("All GFA Fans should be turned OFF now: ", datetime.datetime.now())
 
-print("Now double checking the GFA Fans are turned ON at 15%")
+print("Now double checking the GFA Fans are turned OFF")
 
 for i, comm in enumerate(Comms):
     print("Petal Location %d" % i)

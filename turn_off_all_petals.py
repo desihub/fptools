@@ -1,29 +1,36 @@
+
 import sys
 sys.path.append('/home/msdos/focalplane/plate_control/trunk/petal')
 import datetime
 import numpy as np
 import petalcomm
 import petal
+import time
 
 
 start_time = datetime.datetime.now()
 print(start_time)
 Comms = []
 for pc in [0,1,2,3,4,5,6,7,8,9]:
+
     try:
         Comms.append(petalcomm.PetalComm(pc))
     except:
-    	print("Can't connect with PC%d" % pc)
-
+        print("Can't connect to PC%d" % i)
 for i, comm in enumerate(Comms):
-    comm.pbset('GFA_FAN', {'inlet':['on', 15],'outlet':['on',15]})
+    try:
+        comm.pbset('PS1_EN', 'off')
+        comm.pbset('PS2_EN', 'off')
+        print("The Petal in location %d is turned OFF" % i)
+    except:
+        print("Some issue with PC%d" % i)
 
+print("All Petals should be turned OFF now: ", datetime.datetime.now())
 
-print("All GFA Fans should be turned OFF now: ", datetime.datetime.now())
-
-print("Now double checking the GFA Fans are turned ON at 15%")
+time.sleep(2)
+print("Now double checking")
 
 for i, comm in enumerate(Comms):
     print("Petal Location %d" % i)
-    print(comm.pbget('GFA_FAN'))
+    print(comm.pbget('pospwr_fbk'))
 
