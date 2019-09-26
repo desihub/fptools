@@ -9,7 +9,7 @@ import petal
 start_time = datetime.datetime.now()
 print(start_time)
 Comms = []
-for pc in [0,1,2,3,4,5,6,7,8,9]:
+for pc in [0,1,3,4,5,6,7,8,9]:
     try:
         Comms.append(petalcomm.PetalComm(pc))
     except:

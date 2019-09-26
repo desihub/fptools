@@ -17,9 +17,10 @@ for pc in [0,1,2,3,4,5,6,7,8,9]:
 
 for i, comm in enumerate(Comms):
     comm.pbset('GFA_FAN', {'inlet':['on', 15],'outlet':['on',15]})
+    print("GFA Fans turned on for PC%d"%i)
 
 
-print("All GFA Fans should be turned OFF now: ", datetime.datetime.now())
+print("All GFA Fans should be turned ON now: ", datetime.datetime.now())
 
 print("Now double checking the GFA Fans are turned ON at 15%")
 

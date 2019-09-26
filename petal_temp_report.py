@@ -14,6 +14,7 @@ plt.rcParams['font.size'] = 12
 date_today = input("What date information do you want? (YYYYMMDD): ")
 
 
+
 cc = ['FPP_TEMP_SENSOR_3', 'FPP_TEMP_SENSOR_2', 'PBOX_TEMP_SENSOR', 'GXB_MONITOR', 'FPP_TEMP_SENSOR_1', 'ADC0', 'ADC2','ADC4', 'ADC3', 'ADC1','MEAN_POS','MEAN_FID','DATE']
 
 Petal_to_PC = {0:4, 1:5, 2:6, 3:3, 4:8, 5:10, 6:11, 7:2, 8:7, 9:9}
@@ -105,7 +106,7 @@ data_list = [ df0,df1, df2, df3, df4, df5, df6, df7, df8, df9]
 
 
 #PLOT 1
-colors = iter(ccc.values())
+colors = iter(tab_colors.values())
 plt.figure(figsize=(10,6))
 for i, data in enumerate(data_list):
     plt.plot(data['DATE'], data['MEAN_POS'], 'o',label = i)
@@ -119,17 +120,16 @@ plt.ylim(0,40)
 comps = ['PBOX_TEMP_SENSOR', 'FPP_TEMP_SENSOR_1','FPP_TEMP_SENSOR_2', 'FPP_TEMP_SENSOR_3', 'GXB_MONITOR']
 fig, axarr = plt.subplots(len(comps),1, figsize = (12, 24))
 for x, comp in enumerate(comps):
-    colors = iter(ccc.values())
+    colors = iter(tab_colors.values())
     for i, data in enumerate(data_list):
         axarr[x].plot(data['DATE'], data[comp], label = i)
-    for line, time in important_times.items():
-        axarr[x].axvline(time, linestyle='--', label = line, color = next(colors))
     axarr[x].legend(bbox_to_anchor=(1.3,1), loc='upper right', ncol=1)
     axarr[x].set_ylabel('Temp (C)')
     axarr[x].set_title(comp+': %s' % date_today)
 
-pos_temp_list = [PosTemps0, PosTemps1, PosTemps2, PosTemps3, PosTemps4, PosTemps5, PosTemps6, PosTemps7, PosTemps8, PosTemps9]
+pos_temp_list = [PosTemps0, PosTemps1, PosTemps2, PosTemps3, PosTemps4, PosTemps5, PosTemps6, PosTemps7, PosTemps8] #, PosTemps9
 #PLOT 3
+
 plt.figure(figsize=(12,10))
 all_all = []
 for pc, petal_data in enumerate(pos_temp_list):

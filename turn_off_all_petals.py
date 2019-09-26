@@ -16,7 +16,7 @@ for pc in [0,1,2,3,4,5,6,7,8,9]:
     try:
         Comms.append(petalcomm.PetalComm(pc))
     except:
-        print("Can't connect to PC%d" % i)
+        print("Can't connect to PC%d" % pc)
 for i, comm in enumerate(Comms):
     try:
         comm.pbset('PS1_EN', 'off')

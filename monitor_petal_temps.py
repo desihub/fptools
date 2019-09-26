@@ -11,7 +11,8 @@ tab_colors = mcolors.TABLEAU_COLORS
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.size'] = 12
 
-date_today = '20190920' #input("What date information do you want? (YYYYMMDD): ")
+start_time = datetime.datetime.now()
+date_today = str(start_time.year)+str(start_time.month).zfill(2)+str(start_time.day)#'20190920' #input("What date information do you want? (YYYYMMDD): ")
 
 
 cc = ['PBOX_TEMP_SENSOR', 'FPP_TEMP_SENSOR_1', 'FPP_TEMP_SENSOR_2', 'FPP_TEMP_SENSOR_3', 'GXB_MONITOR', 'ADC0', 'ADC1', 'ADC2', 'ADC3', 'ADC4', 'MEAN_POS', 'MEAN_FID', 'DATE']
@@ -47,21 +48,23 @@ def get_data(PC):
 		D = D.append(df)
 
 	return PosTemp, D
-
-
+fig, (ax1, ax2, ax3) = plt.subplots(3,1, figsize=(12,18))
 while True:
 	PosTemps = []
 	PetalTemps = []
 	for i in [0,1,2,3,4,5,6,7,8,9]:
-		PosTemp, PetalTemp = get_data(i)
-		PosTemps.append(PosTemp)
-		PetalTemps.append(PetalTemp)
+		try:
+		    PosTemp, PetalTemp = get_data(i)
+		    PosTemps.append(PosTemp)
+		    PetalTemps.append(PetalTemp)
+		except:
+			print("Can't get data for PC %d" % i)
 
 	colors = iter(tab_colors.values())
 
-	fig, (ax1, ax2, ax3) = plt.subplots(3,1, figsize=(12,20))
+	
 	for i, data in enumerate(PetalTemps):
-
+		print(np.array(data['DATE']))
 		color = next(colors)
 		ax1.plot(data['DATE'], data['MEAN_POS'], 'x', color = color, label = i)
 		ax1.plot(data['DATE'], data['MEAN_FID'], '.', color = color)
@@ -71,12 +74,14 @@ while True:
 
 		ax2.plot(data['DATE'], data['PBOX_TEMP_SENSOR'], color = color, label = i)
 		ax2.set_title("PBOX Temp. %s" % date_today)
-		ax2.legend()
 		ax3.plot(data['DATE'], data['GXB_MONITOR'], color = color)
 		ax3.set_title("GXB Temp. %s" % date_today)
-
-	plt.draw()
-	plt.pause(30)
+		ax1.set_xlim(min(data['DATE']), max(data['DATE']))
+		ax2.set_xlim(min(data['DATE']), max(data['DATE']))
+		ax3.set_xlim(min(data['DATE']), max(data['DATE']))
+	#fig.tight_layout()
+	#plt.draw()
+	plt.pause(40)
 
 
 

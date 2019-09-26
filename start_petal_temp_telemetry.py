@@ -155,12 +155,13 @@ class PetalTempApp():
 if __name__ == '__main__':
     postemp_wait = 300 #int(input("How long should you wait between taking measurements of the positioner temps? (sec): "))
     fidtemp_wait = 30 #int(input("How long should you wait between taking measurements of the fiducial temps? (sec): "))
-    #pc = int(input("Which PC? "))
-    #P = PetalTempApp(pc, postemp_wait, fidtemp_wait)
-    #P.run()
+    pc = int(input("Which PC? "))
+    P = PetalTempApp(pc, postemp_wait, fidtemp_wait)
+    P.run()
 
+    """
     P0=PetalTempApp(0, postemp_wait, fidtemp_wait)
-    P1=PetalTempApp(1, postemp_wait, fidtemp_wait)
+    #P1=PetalTempApp(1, postemp_wait, fidtemp_wait)
     P2=PetalTempApp(2, postemp_wait, fidtemp_wait)
     P3=PetalTempApp(3, postemp_wait, fidtemp_wait)
     P4=PetalTempApp(4, postemp_wait, fidtemp_wait)
@@ -168,10 +169,12 @@ if __name__ == '__main__':
     P6=PetalTempApp(6, postemp_wait, fidtemp_wait)
     P7=PetalTempApp(7, postemp_wait, fidtemp_wait)
     P8=PetalTempApp(8, postemp_wait, fidtemp_wait)
-    P9=PetalTempApp(9, postemp_wait, fidtemp_wait)
+    #P9=PetalTempApp(9, postemp_wait, fidtemp_wait)
+
+    PETALS = [P0, P1, P2, P3, P4, P5, P6, P7, P8, P9]
 
     Thread(P0.run()).start()
-    Thread(P1.run()).start()
+    #Thread(P1.run()).start()
     Thread(P2.run()).start()
     Thread(P3.run()).start()
     Thread(P4.run()).start()
@@ -179,5 +182,6 @@ if __name__ == '__main__':
     Thread(P6.run()).start()
     Thread(P7.run()).start()
     Thread(P8.run()).start()
-    Thread(P9.run()).start()
+    #Thread(P9.run()).start()
+    """
 
